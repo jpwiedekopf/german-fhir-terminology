@@ -1,0 +1,6 @@
+[submodule "Medicats"]
+	path = Medicats
+	url = https://github.com/hhund/medicats.git
+[submodule "FHIR-ClaML"]
+	path = FHIR-ClaML
+	url = https://github.com/aehrc/fhir-claml.git

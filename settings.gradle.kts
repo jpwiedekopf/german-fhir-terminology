@@ -1,0 +1,1 @@
+rootProject.name = "german-fhir-terminology"
