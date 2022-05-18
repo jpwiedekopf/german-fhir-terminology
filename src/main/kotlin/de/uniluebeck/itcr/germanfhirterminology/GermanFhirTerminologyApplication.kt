@@ -79,7 +79,7 @@ class GermanFhirTerminology(
 
     @Option(
         names = ["--url", "-u"],
-        description = ["Output URL of the generated CodeSystem(-s) (\${COMPLETION-CANDIDATES})"],
+        description = ["Output URL of the generated CodeSystem(-s) (\${COMPLETION-CANDIDATES}), default=\${DEFAULT-VALUE}"],
         defaultValue = "BOTH"
     )
     lateinit var outputUrlNamespace: OutputUrlNamespace
@@ -113,7 +113,7 @@ class GermanFhirTerminology(
             ConversionRoutine.CLAML -> TODO()
         }
         val codeSystem = converter.runConversion(inputFilename, resourceType, version)
-        outputService.writeResources(codeSystem, outputDirectory, outputUrlNamespace)
+        outputService.writeResources(codeSystem, resourceType, version, outputDirectory, outputUrlNamespace)
         return 0
     }
 
@@ -132,6 +132,7 @@ interface TerminologyConversionService {
     fun runConversion(inputFilename: File, resourceType: ResourceType, version: String): CodeSystem
 }
 
+@Suppress("unused")
 enum class ResourceType {
     ICD10GM, OPS, ALPHAID, ICDO
 }
@@ -145,7 +146,7 @@ enum class OutputUrlNamespace {
 }
 
 private fun isArchive(f: File): Boolean {
-    var fileSignature = 0
+    var fileSignature: Int
     try {
         RandomAccessFile(f, "r").use { raf -> fileSignature = raf.readInt() }
     } catch (e: IOException) {
