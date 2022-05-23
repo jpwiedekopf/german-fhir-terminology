@@ -121,9 +121,11 @@ class OpsSgmlNodeFactory(
     override fun getTransitionFile(): FileSource? = null
     override fun getSgml(): FileSource {
         val op301files = getFilesByName("op301.sgm")
-        return when (val erweiterung = op301files.find { it.first.pathString.contains("ees") } ?: op301files.find { it.first.pathString.contains("erw") }) {
-            null -> op301files.first().second
-            else -> erweiterung.second
+        val sgml =  when (val erweiterung = op301files.find { it.first.pathString.contains("ees") } ?: op301files.find { it.first.pathString.contains("erw") }) {
+            null -> op301files.first()
+            else -> erweiterung
         }
+        logger.info("Reading SGML from: ${sgml.first}")
+        return sgml.second
     }
 }
