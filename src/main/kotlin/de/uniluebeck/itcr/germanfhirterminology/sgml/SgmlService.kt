@@ -2,10 +2,10 @@ package de.uniluebeck.itcr.germanfhirterminology.sgml
 
 import de.gecko.medicats.VersionedNode
 import de.gecko.medicats.icd10.sgml.SgmlIcdNode
-import de.gecko.medicats.ops.OpsNode
 import de.gecko.medicats.ops.sgml.SgmlOpsNode
 import de.uniluebeck.itcr.germanfhirterminology.ResourceType
 import de.uniluebeck.itcr.germanfhirterminology.TerminologyConversionService
+import org.hl7.fhir.r4.model.BooleanType
 import org.hl7.fhir.r4.model.CodeSystem
 import org.hl7.fhir.r4.model.CodeType
 import org.hl7.fhir.r4.model.StringType
@@ -20,6 +20,11 @@ private val logger: Logger = LoggerFactory.getLogger(SgmlService::class.java)
 
 const val INCLUSION_CODE = "inclusion"
 const val EXCLUSION_CODE = "exclusion"
+const val HINT_CODE = "hint"
+const val PROPERTY_DEFINITION = "%s for this node. Please note that these should the valueString of this property should " +
+        "not be used directly for ETL/mapping purposes, as the algorithm is currently deficient in its handling of " +
+        "multi-column markup that is commonly used throughout the SGML documents."
+const val IS_CURATED_CODE = "is-curated"
 const val PARENT_CODE = "parent"
 const val ROOT = "ROOT"
 
@@ -40,10 +45,23 @@ class SgmlService : TerminologyConversionService {
             addProperty().apply {
                 code = INCLUSION_CODE
                 type = CodeSystem.PropertyType.STRING
+                description = PROPERTY_DEFINITION.format("An inclusion criterion")
             }
             addProperty().apply {
                 code = EXCLUSION_CODE
                 type = CodeSystem.PropertyType.STRING
+                description = PROPERTY_DEFINITION.format("An exclusion criterion")
+            }
+            addProperty().apply {
+                code = HINT_CODE
+                type = CodeSystem.PropertyType.STRING
+                description = PROPERTY_DEFINITION.format("A coding hint")
+            }
+            if (resourceType == ResourceType.OPS) addProperty().apply {
+                code = IS_CURATED_CODE
+                type = CodeSystem.PropertyType.BOOLEAN
+                description = "If true, this code is/was used for billing purposes, and does not come from the 'extension" +
+                        "catalog of OPS-301."
             }
         }
         logger.info("Walking nodes...")
@@ -70,15 +88,46 @@ class SgmlService : TerminologyConversionService {
                         val sgmlNode = node as SgmlIcdNode
                         addInExclusion(this, INCLUSION_CODE, sgmlNode.inclusionCodes, sgmlNode.inclusionStrings)
                         addInExclusion(this, EXCLUSION_CODE, sgmlNode.exclusionCodes, sgmlNode.exclusionStrings)
+                        addHints(this, sgmlNode.hints)
                     }
                     ResourceType.OPS -> {
                         val sgmlNode = node as SgmlOpsNode
-                        addOpsProperty(INCLUSION_CODE, sgmlNode.getInclusions { code ->
-                            allNodes.filter { it.code == code }.map { it as OpsNode }
-                        })
+                        addInExclusionTexts(this, INCLUSION_CODE, sgmlNode.inclusionStrings)
+                        addInExclusionTexts(this, EXCLUSION_CODE, sgmlNode.exclusionStrings)
+                        addHints(this, sgmlNode.hints)
+                        addAmtl(this, sgmlNode)
                     }
                 }
             }
+        }
+        logger.info("Started with ${allNodes.size - 1} nodes (excluding root); wrote ${cs.concept.size} concepts to FHIR")
+    }
+
+    private fun addAmtl(conceptDefinitionComponent: CodeSystem.ConceptDefinitionComponent, sgmlNode: SgmlOpsNode) {
+        conceptDefinitionComponent.addProperty().apply {
+            code = IS_CURATED_CODE
+            value = BooleanType(sgmlNode.isAmtl)
+        }
+    }
+
+    private fun addHints(
+        conceptDefinitionComponent: CodeSystem.ConceptDefinitionComponent,
+        hints: List<String>
+    ) = hints.forEach { hint ->
+        conceptDefinitionComponent.addProperty().apply {
+            code = HINT_CODE
+            value = StringType(hint)
+        }
+    }
+
+    private fun addInExclusionTexts(
+        conceptDefinitionComponent: CodeSystem.ConceptDefinitionComponent,
+        propertyCode: String,
+        strings: List<String>
+    ) = strings.forEach { s ->
+        conceptDefinitionComponent.addProperty().apply {
+            code = propertyCode
+            value = StringType(s)
         }
     }
 }
@@ -97,15 +146,6 @@ fun addInExclusion(
         concept.addProperty().apply {
             code = propertyCode
             value = StringType(prop)
-        }
-    }
-}
-
-fun CodeSystem.ConceptDefinitionComponent.addOpsProperty(propCode: String, nodes: Stream<OpsNode>) {
-    nodes.forEach { node ->
-        this.addProperty().apply {
-            code = propCode
-            value = CodeType(node.code)
         }
     }
 }

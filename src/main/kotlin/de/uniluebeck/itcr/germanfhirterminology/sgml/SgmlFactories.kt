@@ -18,9 +18,12 @@ import java.io.File
 import java.nio.file.FileSystem
 import java.nio.file.FileSystems
 import java.nio.file.Files
+import java.nio.file.Path
 import java.util.stream.Collectors
 import java.util.stream.Stream
+import kotlin.Pair
 import kotlin.io.path.name
+import kotlin.io.path.pathString
 
 private val logger: Logger = LoggerFactory.getLogger("SgmlFactory")
 
@@ -54,14 +57,12 @@ interface MyNodeFactory<Node : VersionedNode<Node>?, Walker : NodeWalker<Node>?>
 interface ZipFileChapterConsumer {
     val inputFilename: File
     val zip: NonValidatingZipSource
-
-    //get() = NonValidatingZipSource(inputFilename)
     val zipFileSystem: FileSystem
-    //get() = FileSystems.newFileSystem(inputFilename.toPath())
 
-    fun getFilesByName(pattern: String) =
-        Files.find(zipFileSystem.getPath("/"), 999, { p, _ -> p.name.lowercase().matches(Regex(pattern)) })
+    fun getFilesByName(pattern: String): List<Pair<Path, FileSource>> {
+        return Files.find(zipFileSystem.getPath("/"), 999, { p, _ -> p.name.lowercase().matches(Regex(pattern)) })
             .collect(Collectors.toList()).sorted().map { it to FileSource(zip, it.parent.toString(), it.name) }
+    }
 }
 
 class SgmlIcdNodeFactory(
@@ -75,7 +76,8 @@ class SgmlIcdNodeFactory(
 
     private val filterOutPrefixes = listOf("x1ses")
 
-    private val myChapterFiles = getFilesByName("kap\\d\\d.sgm").filter { (path, _) -> filterOutPrefixes.none { path.toString().contains(it) } }
+    private val myChapterFiles =
+        getFilesByName("kap\\d\\d.sgm").filter { (path, _) -> filterOutPrefixes.none { path.toString().contains(it) } }
     override val resourceType: ResourceType
         get() = ResourceType.ICD10GM
 
@@ -117,5 +119,11 @@ class OpsSgmlNodeFactory(
     override fun getSystFile(): FileSource? = null
 
     override fun getTransitionFile(): FileSource? = null
-    override fun getSgml(): FileSource = getFilesByName("OP301.sgm").first().let { (_, fs) -> fs }
+    override fun getSgml(): FileSource {
+        val op301files = getFilesByName("op301.sgm")
+        return when (val erweiterung = op301files.find { it.first.pathString.contains("ees") } ?: op301files.find { it.first.pathString.contains("erw") }) {
+            null -> op301files.first().second
+            else -> erweiterung.second
+        }
+    }
 }

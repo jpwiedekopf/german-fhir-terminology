@@ -20,7 +20,7 @@ repositories {
 
 dependencies {
     val hapiVersion = "5.7.2"
-    val medicatsVersion = "8c3dbd43ce"
+     val medicatsVersion = "95624e33"
     implementation("info.picocli:picocli-spring-boot-starter:4.6.3")
     implementation("org.jetbrains.kotlin:kotlin-reflect")
     implementation("org.jetbrains.kotlin:kotlin-stdlib-jdk8")
